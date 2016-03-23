@@ -1,0 +1,76 @@
+#!/bin/bash
+
+browse() {
+
+    FILES=(*)
+    FILES=("back" "${FILES[@]}")
+
+    HEIGHT=100
+    WIDTH=100
+    CHOICE_HEIGHT=100
+    TITLE="Choose a file to open in Sublime"
+    MENU="$PWD:"
+
+    OPTIONS=()
+
+    for ((i = 0; i < ${#FILES[@]}; i++))
+    do
+        OPTIONS+=($i)
+        OPTIONS+=("${FILES[$i]}")
+    done
+
+    CHOICE=$(dialog --clear \
+                    --title "$TITLE" \
+                    --menu "$MENU" \
+                    $HEIGHT $WIDTH $CHOICE_HEIGHT \
+                    "${OPTIONS[@]}" \
+                    2>&1 >/dev/tty)
+    
+    SELECTED="${FILES[$CHOICE]}"
+
+    if [ $SELECTED == "back" ]; then
+        cd ..
+        browse
+    elif [ -d $SELECTED ]; then
+        cd $SELECTED
+        browse
+    else
+        rsub $SELECTED
+        browse
+    fi
+}
+
+setup() {
+
+    if command -v rsub >/dev/null 2>&1; then
+
+        if command -v dialog >/dev/null 2>&1; then
+
+            browse
+        else
+            echo "dialog not found. Installing it..."
+
+            sudo yum install dialog
+
+            if command -v dialog >/dev/null 2>&1; then
+
+                browse
+            else
+                echo "Installing dialog failed."
+            fi
+        fi
+
+    else
+        echo "rsub not found. Installing it..."
+
+        sudo wget -O /usr/local/bin/rsub https://raw.github.com/aurora/rmate/master/rmate
+
+        if command -v rsub >/dev/null 2>&1; then
+            setup
+        else
+            echo "Installing rsub failed."
+        fi
+    fi
+}
+
+setup
