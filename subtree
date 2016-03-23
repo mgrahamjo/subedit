@@ -65,6 +65,8 @@ setup() {
 
         sudo wget -O /usr/local/bin/rsub https://raw.github.com/aurora/rmate/master/rmate
 
+        sudo chmod 777 /usr/local/bin/rsub
+
         if command -v rsub >/dev/null 2>&1; then
             setup
         else
