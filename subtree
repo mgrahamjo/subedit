@@ -2,42 +2,54 @@
 
 trap "clear && exit 0" INT
 
+HEIGHT=100
+WIDTH=70
+CHOICE_HEIGHT=100
+BACKTITLE="Press Ctrl+c to quit"
+
 browse() {
 
-    FILES=(*)
-    FILES=("back" "${FILES[@]}")
-
-    HEIGHT=100
-    WIDTH=100
-    CHOICE_HEIGHT=100
-    TITLE="Choose a file to open in Sublime"
     MENU="$PWD:"
+    TITLE="Choose a file to open in Sublime"
 
-    OPTIONS=()
+    ALL=(*)
 
-    for ((i = 0; i < ${#FILES[@]}; i++))
+    DIRS=(">search" "" "<back" "")
+    FILES=()
+
+    for ((i = 0; i < ${#ALL[@]}; i++))
     do
-        OPTIONS+=($i)
-        OPTIONS+=("${FILES[$i]}")
+        if [ -d ${ALL[$i]} ]; then
+            DIRS+=("${ALL[$i]}/")
+            DIRS+=("")
+        else
+            FILES+=("${ALL[$i]}")
+            FILES+=("")
+        fi
     done
 
+    OPTIONS=("${DIRS[@]}" "${FILES[@]}")
+
     CHOICE=$(dialog --clear \
+                    --backtitle "$BACKTITLE" \
+                    --ok-label "Select" \
+                    --no-cancel \
                     --title "$TITLE" \
                     --menu "$MENU" \
                     $HEIGHT $WIDTH $CHOICE_HEIGHT \
                     "${OPTIONS[@]}" \
                     2>&1 >/dev/tty)
-    
-    SELECTED="${FILES[$CHOICE]}"
 
-    if [ $SELECTED == "back" ]; then
+    if [ $CHOICE == ">search" ]; then
+        search
+    elif [ $CHOICE == "<back" ]; then
         cd ..
         browse
-    elif [ -d $SELECTED ]; then
-        cd $SELECTED
+    elif [ -d $CHOICE ]; then
+        cd $CHOICE
         browse
     else
-        rsub $SELECTED
+        rsub $CHOICE
         browse
     fi
 }
@@ -78,6 +90,59 @@ setup() {
 
             exit 1
         fi
+    fi
+}
+
+search() {
+
+    MENU="Search file and directory names"
+    TITLE="Search:"
+
+    SEARCH=$(dialog --clear \
+                    --backtitle "$BACKTITLE" \
+                    --ok-label "Search" \
+                    --no-cancel \
+                    --title "$TITLE" \
+                    --inputbox "$MENU" \
+                    $HEIGHT $WIDTH \
+                    2>&1 >/dev/tty)
+
+    DIRS=("<back" "")
+    FILES=()
+
+    RESULTS=($(find . -regex ".*$SEARCH.*"))
+    
+    for ((i = 0; i < ${#RESULTS[@]}; i++))
+    do
+        if [ -d ${RESULTS[$i]} ]; then
+            DIRS+=("${RESULTS[$i]}/")
+            DIRS+=("")
+        else
+            FILES+=("${RESULTS[$i]}")
+            FILES+=("")
+        fi
+    done
+
+    OPTIONS=("${DIRS[@]}" "${FILES[@]}")
+
+    MENU="Results:"
+    TITLE="Choose a file to open in Sublime"
+
+    CHOICE=$(dialog --clear \
+                    --backtitle "$BACKTITLE" \
+                    --ok-label "Select" \
+                    --no-cancel \
+                    --title "$TITLE" \
+                    --menu "$MENU" \
+                    $HEIGHT $WIDTH $CHOICE_HEIGHT \
+                    "${OPTIONS[@]}" \
+                    2>&1 >/dev/tty)
+    
+    if [ $CHOICE == "<back" ]; then
+        browse
+    else
+        rsub $CHOICE
+        browse
     fi
 }
 
