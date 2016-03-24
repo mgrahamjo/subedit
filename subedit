@@ -1,0 +1,193 @@
+#!/bin/bash
+
+trap "clear && exit 0" INT
+
+HEIGHT=100
+WIDTH=70
+CHOICE_HEIGHT=100
+BACKTITLE="Press Ctrl+c to quit"
+
+# handle user selection
+handle() {
+    if [ -d $1 ]; then
+        cd $1
+        browse
+    elif [ $1 == ">search" ]; then
+        search
+    elif [ $1 == "<back" ]; then
+        cd ..
+        browse
+    elif [ $1 == "*new" ]; then
+        new
+    else
+        rsub $1
+        browse
+    fi
+}
+
+# browse directories
+browse() {
+
+    TITLE="Choose a file to open in Sublime"
+    MENU="$PWD:"
+
+    PRE=($(ls -a))
+    ALL=("${PRE[@]:2}")
+
+    DIRS=(">search" "" "<back" "")
+    FILES=()
+
+    for ((i = 0; i < ${#ALL[@]}; i++))
+    do
+        if [ -d ${ALL[$i]} ]; then
+            DIRS+=("${ALL[$i]}/")
+            DIRS+=("")
+        else
+            FILES+=("${ALL[$i]}")
+            FILES+=("")
+        fi
+    done
+
+    OPTIONS=("${DIRS[@]}" "${FILES[@]}" "*new" "")
+
+    CHOICE=$(dialog --clear \
+                    --colors \
+                    --backtitle "$BACKTITLE" \
+                    --ok-label "Select" \
+                    --title "$TITLE" \
+                    --menu "$MENU" \
+                    $HEIGHT $WIDTH $CHOICE_HEIGHT \
+                    "${OPTIONS[@]}" \
+                    2>&1 >/dev/tty)
+
+    if test $? -eq 0; then
+        handle $CHOICE
+    else
+        clear && exit 0
+    fi
+}
+
+# search for a folder or file
+search() {
+
+    TITLE="Search:"
+    MENU="$PWD:"
+
+    SEARCH=$(dialog --clear \
+                    --backtitle "$BACKTITLE" \
+                    --ok-label "Search" \
+                    --title "$TITLE" \
+                    --inputbox "$MENU" \
+                    $HEIGHT $WIDTH \
+                    2>&1 >/dev/tty)
+    
+    if test $? -eq 1; then
+        browse
+    else
+            
+        DIRS=("<back" "")
+        FILES=()
+
+        RESULTS=($(find . -regex ".*$SEARCH.*"))
+        
+        for ((i = 0; i < ${#RESULTS[@]}; i++))
+        do
+            if [ -d ${RESULTS[$i]} ]; then
+                DIRS+=("${RESULTS[$i]}/")
+                DIRS+=("")
+            else
+                FILES+=("${RESULTS[$i]}")
+                FILES+=("")
+            fi
+        done
+
+        OPTIONS=("${DIRS[@]}" "${FILES[@]}" "*new" "")
+
+        TITLE="Choose a file to open in Sublime"
+        MENU="Results:"
+
+        CHOICE=$(dialog --clear \
+                        --backtitle "$BACKTITLE" \
+                        --ok-label "Select" \
+                        --title "$TITLE" \
+                        --menu "$MENU" \
+                        $HEIGHT $WIDTH $CHOICE_HEIGHT \
+                        "${OPTIONS[@]}" \
+                        2>&1 >/dev/tty)
+        
+        if test $? -eq 0; then
+            handle $CHOICE
+        else
+            browse
+        fi
+    fi
+}
+
+# make a new file
+new() {
+
+    TITLE="Create a file:"
+    MENU="$PWD:"
+
+    FNAME=$(dialog --clear \
+                    --backtitle "$BACKTITLE" \
+                    --ok-label "Create" \
+                    --title "$TITLE" \
+                    --inputbox "$MENU" \
+                    $HEIGHT $WIDTH \
+                    2>&1 >/dev/tty)
+
+    if test $? -eq 0; then
+
+        touch $FNAME >/dev/null 2>&1 || mkdir -p $(dirname $FNAME) && touch $FNAME
+
+        rsub $FNAME
+
+        browse
+
+    else
+        browse
+    fi
+}
+
+# make sure dependencies are installed before browsing
+setup() {
+
+    if command -v rsub >/dev/null 2>&1; then
+
+        if command -v dialog >/dev/null 2>&1; then
+
+            browse
+        else
+            echo "dialog not found. Installing it..."
+
+            sudo yum install dialog
+
+            if command -v dialog >/dev/null 2>&1; then
+
+                browse
+            else
+                echo "Installing dialog failed."
+
+                exit 1
+            fi
+        fi
+
+    else
+        echo "rsub not found. Installing it..."
+
+        sudo wget -O /usr/local/bin/rsub https://raw.github.com/aurora/rmate/master/rmate
+
+        sudo chmod 777 /usr/local/bin/rsub
+
+        if command -v rsub >/dev/null 2>&1; then
+            setup
+        else
+            echo "Installing rsub failed."
+
+            exit 1
+        fi
+    fi
+}
+
+setup
